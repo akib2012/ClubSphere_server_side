@@ -64,7 +64,21 @@ async function run() {
     const usersconllections = db.collection("users");
     const clubcollections = db.collection("clubs");
 
+    //
+
     // users api here
+
+    app.patch("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const { role } = req.body;
+
+      const result = await usersconllections.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { role } }
+      );
+
+      res.send(result);
+    });
 
     app.post("/users", async (req, res) => {
       const usersinfo = req.body;
@@ -90,6 +104,12 @@ async function run() {
       res.send({ role: user?.role || "member" });
     });
 
+    // all users here:
+    app.get("/users", async (req, res) => {
+      const result = await usersconllections.find().toArray();
+      res.send(result);
+    });
+
     /* clube related api here */
 
     app.get("/clubs", async (req, res) => {
@@ -99,12 +119,10 @@ async function run() {
     });
 
     app.get("/clubs/approved", async (req, res) => {
-     
-        const approvedClubs = await clubcollections
-          .find({ status: "aproved" })
-          .toArray();
-        res.send(approvedClubs);
-      
+      const approvedClubs = await clubcollections
+        .find({ status: "aproved" })
+        .toArray();
+      res.send(approvedClubs);
     });
 
     app.post("/club", async (req, res) => {
