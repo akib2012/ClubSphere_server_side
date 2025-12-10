@@ -35,7 +35,10 @@ app.use(express.json());
 // JWT middleware
 const verifyJWT = async (req, res, next) => {
   const token = req.headers?.authorization?.split(" ")[1];
-  if (!token) return res.status(401).send({ message: "Unauthorized Access!" });
+  console.log("access token here: >>>>", token);
+  console.log(req.tokenEmail);
+
+  if (!token) return res.status(401).send({ message: "Unauthorized Access!  here " });
 
   try {
     const decoded = await admin.auth().verifyIdToken(token);
@@ -157,22 +160,34 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/memberships/my", async (req, res) => {
-      const clubId = req.query.clubId;
-
-      if (!clubId) {
-        return res.status(400).send({ message: "clubId is required" });
-      }
-
+    app.get("/memberships/my", verifyJWT, async (req, res) => {
       try {
-        const result = await membershipCollections.findOne({
-          clubId: String(clubId), 
+        const { clubId } = req.query;
+        console.log(clubId);
+        const email = req.tokenEmail; 
+        console.log({email});
+
+        if (!clubId) {
+          return res.status(400).json({ message: "clubId is required" });
+        }
+
+        if (!email) {
+          return res.status(401).json({ message: "Unauthorized verify" });
+        }
+        // query= {}
+        console.log({ clubId: String(clubId),
+          email: email, })
+        const membership = await membershipCollections.findOne({
+          clubId: String(clubId),
+          userEmail: email, 
         });
 
-        res.send(result ?? null);
+        res.status(200).json(membership ?? null);
       } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Internal server error" });
+        console.error("Error fetching membership:", err);
+        res
+          .status(500)
+          .json({ message: "Internal server error", error: err.message });
       }
     });
 
