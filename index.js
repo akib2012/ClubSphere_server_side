@@ -38,7 +38,8 @@ const verifyJWT = async (req, res, next) => {
   console.log("access token here: >>>>", token);
   console.log(req.tokenEmail);
 
-  if (!token) return res.status(401).send({ message: "Unauthorized Access!  here " });
+  if (!token)
+    return res.status(401).send({ message: "Unauthorized Access!  here " });
 
   try {
     const decoded = await admin.auth().verifyIdToken(token);
@@ -135,6 +136,16 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/myclubs',verifyJWT, async(req,res) => {
+      const email = req.tokenEmail;
+      // console.log("here is test email:",email);
+      const cluberwoner = clubcollections.find({managerEmail: email});
+      const result  = await cluberwoner.toArray();
+      res.send(result);
+
+      
+    })
+
     app.post("/club", async (req, res) => {
       const clubinfo = req.body;
       const result = await clubcollections.insertOne(clubinfo);
@@ -154,18 +165,60 @@ async function run() {
 
     /* memberships related api here */
 
-    app.post("/members", async (req, res) => {
-      const membersinfo = req.body;
-      const result = await membershipCollections.insertOne(membersinfo);
-      res.send(result);
+    app.post("/memberships", verifyJWT, async (req, res) => {
+      try {
+        const email = req.tokenEmail; // token theke email
+        const { clubId, status, joinedAt } = req.body;
+
+        if (!clubId) {
+          return res.status(400).json({ message: "clubId is required" });
+        }
+
+        if (!email) {
+          return res.status(401).json({ message: "Unauthorized" });
+        }
+
+       
+        const alreadyMember = await membershipCollections.findOne({
+          clubId: String(clubId),
+          userEmail: email,
+        });
+
+        if (alreadyMember) {
+          return res.status(409).json({
+            message: "User already joined this club",
+          });
+        }
+
+        
+        const newMembership = {
+          clubId: String(clubId),
+          userEmail: email,
+          status: status,
+          createdAt: joinedAt,
+        };
+
+        const result = await membershipCollections.insertOne(newMembership);
+
+        res.status(201).json({
+          message: "Membership created successfully",
+          membershipId: result.insertedId,
+        });
+      } catch (err) {
+        console.error("Membership create error:", err);
+        res.status(500).json({ message: "Internal server error" });
+      }
     });
+
+
+    /* members ship api get here */
 
     app.get("/memberships/my", verifyJWT, async (req, res) => {
       try {
         const { clubId } = req.query;
         console.log(clubId);
-        const email = req.tokenEmail; 
-        console.log({email});
+        const email = req.tokenEmail;
+        console.log({ email });
 
         if (!clubId) {
           return res.status(400).json({ message: "clubId is required" });
@@ -174,12 +227,10 @@ async function run() {
         if (!email) {
           return res.status(401).json({ message: "Unauthorized verify" });
         }
-        // query= {}
-        console.log({ clubId: String(clubId),
-          email: email, })
+
         const membership = await membershipCollections.findOne({
           clubId: String(clubId),
-          userEmail: email, 
+          userEmail: email,
         });
 
         res.status(200).json(membership ?? null);
