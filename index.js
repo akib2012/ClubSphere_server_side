@@ -63,6 +63,7 @@ async function run() {
     const db = client.db("ClubSphere");
     const usersconllections = db.collection("users");
     const clubcollections = db.collection("clubs");
+    const membershipCollections = db.collection("memberships");
 
     //
 
@@ -112,17 +113,23 @@ async function run() {
 
     /* clube related api here */
 
-    app.get("/clubs", async (req, res) => {
-      const cursor = clubcollections.find();
-      const result = await cursor.toArray();
-      res.send(result);
-    });
-
     app.get("/clubs/approved", async (req, res) => {
       const approvedClubs = await clubcollections
         .find({ status: "aproved" })
         .toArray();
       res.send(approvedClubs);
+    });
+
+    app.get("/clubs/:id", async (req, res) => {
+      const id = new ObjectId(req.params.id);
+      const result = await clubcollections.findOne({ _id: id });
+      res.send(result);
+    });
+
+    app.get("/clubs", async (req, res) => {
+      const cursor = clubcollections.find();
+      const result = await cursor.toArray();
+      res.send(result);
     });
 
     app.post("/club", async (req, res) => {
@@ -140,6 +147,33 @@ async function run() {
         { $set: { status } }
       );
       res.send(result);
+    });
+
+    /* memberships related api here */
+
+    app.post("/members", async (req, res) => {
+      const membersinfo = req.body;
+      const result = await membershipCollections.insertOne(membersinfo);
+      res.send(result);
+    });
+
+    app.get("/memberships/my", async (req, res) => {
+      const clubId = req.query.clubId;
+
+      if (!clubId) {
+        return res.status(400).send({ message: "clubId is required" });
+      }
+
+      try {
+        const result = await membershipCollections.findOne({
+          clubId: String(clubId), 
+        });
+
+        res.send(result ?? null);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Internal server error" });
+      }
     });
 
     await client.db("admin").command({ ping: 1 });
