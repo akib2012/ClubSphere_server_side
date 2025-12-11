@@ -222,7 +222,7 @@ async function run() {
     app.post("/memberships", verifyJWT, async (req, res) => {
       try {
         const email = req.tokenEmail; // token theke email
-        const { clubId, status, joinedAt } = req.body;
+        const { clubId, status, joinedAt, manageremail } = req.body;
 
         if (!clubId) {
           return res.status(400).json({ message: "clubId is required" });
@@ -248,6 +248,7 @@ async function run() {
           userEmail: email,
           status: status,
           createdAt: joinedAt,
+          manageremail: manageremail,
         };
 
         const result = await membershipCollections.insertOne(newMembership);
@@ -264,18 +265,60 @@ async function run() {
 
     /* .....................event create here.....and all api....... */
 
-    app.post("/events", async(req, res) => {
+    app.post("/events", async (req, res) => {
       const eventinfo = req.body;
       const result = await eventscollections.insertOne(eventinfo);
       res.send(result);
     });
 
-    app.get('/Events', async(req,res) => {
-        const events = eventscollections.find();
-        const result = await events.toArray();
-        res.send(result);
+    app.get("/Events", async (req, res) => {
+      const events = eventscollections.find();
+      const result = await events.toArray();
+      res.send(result);
+    });
 
+    app.get("/event/by-wonermail", verifyJWT, async (req, res) => {
+      try {
+        const email = req.tokenEmail;
+        const userEvents = await eventscollections
+          .find({ createdBy: email })
+          .toArray();
+        res.status(200).json(userEvents);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.patch("/events/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedData = req.body;
+
+      const result = await eventscollections.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            title: updatedData.title,
+            location: updatedData.location,
+            eventDate: updatedData.eventDate,
+            description: updatedData.description,
+            isPaid: updatedData.isPaid,
+            eventFee: updatedData.eventFee,
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      res.send(result);
+    });
+
+
+    app.delete('/events/:id', async(req,res) => {
+      const id  = req.params.id;
+      const result  = await eventscollections.deleteOne({_id: new ObjectId(id)});
+      res.send(result)
     })
+
 
 
 
@@ -308,6 +351,39 @@ async function run() {
           .status(500)
           .json({ message: "Internal server error", error: err.message });
       }
+    });
+
+    // mambesship get for the deshboard :
+
+    app.get("/membership", verifyJWT, async (req, res) => {
+      const userEmail = req.tokenEmail;
+
+      const clubs = await clubcollections
+        .find({ managerEmail: userEmail })
+        .toArray();
+
+      if (clubs.length === 0) {
+        return res.send([]);
+      }
+
+      const clubIds = clubs.map((club) => String(club._id));
+
+      const members = await membershipCollections
+        .find({ clubId: { $in: clubIds } })
+        .toArray();
+
+      res.send(members);
+    });
+
+    app.patch("/membership/:id/expire", async (req, res) => {
+      const id = req.params.id;
+
+      const result = await membershipCollections.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status: "expired" } }
+      );
+
+      res.send(result);
     });
 
     await client.db("admin").command({ ping: 1 });
