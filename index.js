@@ -68,7 +68,7 @@ async function run() {
     const usersconllections = db.collection("users");
     const clubcollections = db.collection("clubs");
     const membershipCollections = db.collection("memberships");
-
+    const eventscollections = db.collection("events");
     //
 
     // users api here
@@ -121,6 +121,23 @@ async function run() {
       const approvedClubs = await clubcollections
         .find({ status: "aproved" })
         .toArray();
+      res.send(approvedClubs);
+    });
+
+    app.get("/clubs/approved-by-email", verifyJWT, async (req, res) => {
+      const email = req.tokenEmail;
+
+      if (!email) {
+        return res.status(400).send({ message: "Email is required" });
+      }
+
+      const approvedClubs = await clubcollections
+        .find({
+          status: "aproved",
+          managerEmail: email,
+        })
+        .toArray();
+
       res.send(approvedClubs);
     });
 
@@ -244,6 +261,23 @@ async function run() {
         res.status(500).json({ message: "Internal server error" });
       }
     });
+
+    /* .....................event create here.....and all api....... */
+
+    app.post("/events", async(req, res) => {
+      const eventinfo = req.body;
+      const result = await eventscollections.insertOne(eventinfo);
+      res.send(result);
+    });
+
+    app.get('/Events', async(req,res) => {
+        const events = eventscollections.find();
+        const result = await events.toArray();
+        res.send(result);
+
+    })
+
+
 
     /* members ship api get here */
 
