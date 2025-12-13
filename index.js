@@ -1,7 +1,9 @@
 require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const admin = require("firebase-admin");
 
 const port = process.env.PORT || 3000;
@@ -36,7 +38,7 @@ app.use(express.json());
 const verifyJWT = async (req, res, next) => {
   const token = req.headers?.authorization?.split(" ")[1];
   console.log("access token here: >>>>", token);
-  console.log(req.tokenEmail);
+  // console.log(req.tokenEmail);
 
   if (!token)
     return res.status(401).send({ message: "Unauthorized Access!  here " });
@@ -44,7 +46,7 @@ const verifyJWT = async (req, res, next) => {
   try {
     const decoded = await admin.auth().verifyIdToken(token);
     req.tokenEmail = decoded.email;
-    console.log("Decoded JWT:", decoded);
+    // console.log("Decoded JWT:", decoded);
     next();
   } catch (err) {
     console.error("JWT Verification Error:", err);
@@ -69,6 +71,8 @@ async function run() {
     const clubcollections = db.collection("clubs");
     const membershipCollections = db.collection("memberships");
     const eventscollections = db.collection("events");
+    const eventRegistrationscollection = db.collection("eventRegistrations");
+     const paymentCollection = db.collection('payments');
     //
 
     // users api here
@@ -234,7 +238,7 @@ async function run() {
 
         const alreadyMember = await membershipCollections.findOne({
           clubId: String(clubId),
-          userEmail: email,
+          // userEmail: email,
         });
 
         if (alreadyMember) {
@@ -312,15 +316,120 @@ async function run() {
       res.send(result);
     });
 
+    app.post("/eventRegistrations", async (req, res) => {
+      const info = req.body;
 
-    app.delete('/events/:id', async(req,res) => {
-      const id  = req.params.id;
-      const result  = await eventscollections.deleteOne({_id: new ObjectId(id)});
-      res.send(result)
+      const { useremail, evnetid } = info;
+
+      const exists = await eventRegistrationscollection.findOne({
+        useremail: useremail,
+        evnetid: evnetid,
+      });
+
+      if (exists) {
+        return res.status(400).send({
+          success: false,
+          message: "You are already registered for this event.",
+        });
+      }
+
+      const result = await eventRegistrationscollection.insertOne(info);
+
+      res.send({
+        success: true,
+        insertedId: result.insertedId,
+        message: "Event registration successful.",
+      });
+    });
+
+    app.get('/eventRegistrations', async(req,res) => {
+
+      const result = await eventRegistrationscollection.find().toArray();
+
+      res.send(result);
+
+
+
     })
 
+    app.get("/eventRegistrations/evnetid", async (req, res) => {
+      const eventid = req.query.evnetid;
+      const email = req.query.useremail;
+
+      if (!eventid || !email) {
+        return res
+          .status(400)
+          .send({ message: "Event ID and User Email required" });
+      }
+
+      const result = await eventRegistrationscollection.findOne({
+        evnetid: eventid,
+        useremail: email,
+      });
+
+      res.send(result);
+    });
+
+    ///  get one
+    app.get("/eventRegistrations/evnetid", async (req, res) => {
+      const eventid = req.query.evnetid;
+      const email = req.query.useremail;
+
+      if (!eventid || !email) {
+        return res
+          .status(400)
+          .send({ message: "Event ID and User Email required" });
+      }
+
+      const result = await eventRegistrationscollection.findOne({
+        evnetid: eventid,
+        useremail: email,
+      });
+
+      res.send(result);
+    });
+
+    //  delte one
+
+    app.patch("/eventRegistrations/cancel", async (req, res) => {
+      const { evnetid, useremail } = req.query;
+
+      if (!evnetid || !useremail) {
+        return res
+          .status(400)
+          .send({ message: "Event ID and User Email required" });
+      }
+
+      // Update status to canceled
+      const result = await eventRegistrationscollection.updateOne(
+        { evnetid, useremail },
+        { $set: { status: "canceled" } }
+      );
+
+      if (result.matchedCount === 0) {
+        return res.status(400).send({ message: "Not registered!" });
+      }
+
+      res.send({
+        success: true,
+        message: "Registration canceled!",
+      });
+    });
 
 
+
+    app.delete("/events/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await eventscollections.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+    app.get("/events/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await eventscollections.findOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
 
     /* members ship api get here */
 
@@ -385,6 +494,90 @@ async function run() {
 
       res.send(result);
     });
+  
+    /* .................... payments related api >>>>......................................... */
+    // Payment endpoints
+
+
+    app.post('/create-checkout-session', async (req, res) => {
+      const paymentInfo = req.body
+      console.log(paymentInfo)
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: paymentInfo?.clubName,
+                description: paymentInfo?.description,
+                images: [paymentInfo.bannerImage],
+              },
+              unit_amount: paymentInfo?.amount * 100,
+            },
+            quantity: paymentInfo?.quantity,
+          },
+        ],
+        customer_email: paymentInfo?.userEmail,
+        mode: 'payment',
+        metadata: {
+          plantId: paymentInfo?.clubId,
+          customer: paymentInfo?.userEmail,
+        },
+        success_url: `${process.env.CLIENT_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.CLIENT_DOMAIN}/clubs/${paymentInfo?.clubId}`,
+      })
+      res.send({ url: session.url })
+    })
+
+
+   /*  app.post('/payment-success', async (req, res) => {
+      const { sessionId } = req.body
+      const session = await stripe.checkout.sessions.retrieve(sessionId)
+      const plant = await plantsCollection.findOne({
+        _id: new ObjectId(session.metadata.plantId),
+      })
+      const order = await ordersCollection.findOne({
+        transactionId: session.payment_intent,
+      })
+
+      if (session.status === 'complete' && plant && !order) {
+        // save order data in db
+        const orderInfo = {
+          plantId: session.metadata.plantId,
+          transactionId: session.payment_intent,
+          customer: session.metadata.customer,
+          status: 'pending',
+          seller: plant.seller,
+          name: plant.name,
+          category: plant.category,
+          quantity: 1,
+          price: session.amount_total / 100,
+          image: plant?.image,
+        }
+        const result = await ordersCollection.insertOne(orderInfo)
+        // update plant quantity
+        await plantsCollection.updateOne(
+          {
+            _id: new ObjectId(session.metadata.plantId),
+          },
+          { $inc: { quantity: -1 } }
+        )
+
+        return res.send({
+          transactionId: session.payment_intent,
+          orderId: result.insertedId,
+        })
+      }
+      res.send(
+        res.send({
+          transactionId: session.payment_intent,
+          orderId: order._id,
+        })
+      )
+    }) */
+
+
+
 
     await client.db("admin").command({ ping: 1 });
     console.log("Connected to MongoDB successfully!");
