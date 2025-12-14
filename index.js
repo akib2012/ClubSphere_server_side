@@ -622,12 +622,30 @@ async function run() {
       }
     });
 
-    /* **** paymnet related api here******88 */
-
     app.get("/payments", async (req, res) => {
       const result = await paymentCollection.find().toArray();
       res.send(result);
     });
+
+    // Get payments for the logged-in member
+    app.get("/memberpayments", verifyJWT, async (req, res) => {
+      try {
+        const email = req.tokenEmail;
+
+        if (!email) return res.status(400).json({ message: "Email required" });
+
+        const payments = await paymentCollection
+          .find({ userEmail: email }) 
+          .sort({ createdAt: -1 }) 
+          .toArray();
+
+        res.status(200).json(payments);
+      } catch (err) {
+        console.error("Member payments error:", err);
+        res.status(500).json({ message: "Failed to fetch member payments" });
+      }
+    });
+
 
     /* ********************  admin desh board overviews             ******************************************8 */
 
