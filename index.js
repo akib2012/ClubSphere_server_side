@@ -75,6 +75,31 @@ async function run() {
     const paymentCollection = db.collection("payments");
     //
 
+    const verifyADMIN = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const user = await usersconllections.findOne({ email });
+      if (user?.role !== "admin")
+        return res
+          .status(403)
+          .send({ message: "Admin only Actions!", role: user?.role });
+
+      next();
+    };
+
+     const verifyMANAGER = async (req, res, next) => {
+      const email = req.tokenEmail
+      const user = await usersconllections.findOne({ email })
+      if (user?.role !== 'manager')
+        return res
+          .status(403)
+          .send({ message: 'manager only Actions!', role: user?.role })
+
+      next()
+    }
+
+
+
+
     // users api here
 
     app.patch("/users/:id", async (req, res) => {
@@ -635,8 +660,8 @@ async function run() {
         if (!email) return res.status(400).json({ message: "Email required" });
 
         const payments = await paymentCollection
-          .find({ userEmail: email }) 
-          .sort({ createdAt: -1 }) 
+          .find({ userEmail: email })
+          .sort({ createdAt: -1 })
           .toArray();
 
         res.status(200).json(payments);
@@ -645,7 +670,6 @@ async function run() {
         res.status(500).json({ message: "Failed to fetch member payments" });
       }
     });
-
 
     /* ********************  admin desh board overviews             ******************************************8 */
 
