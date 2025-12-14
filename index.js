@@ -226,7 +226,8 @@ async function run() {
     app.post("/memberships", verifyJWT, async (req, res) => {
       try {
         const email = req.tokenEmail;
-        const { clubId, status, joinedAt, manageremail,clubname,location } = req.body;
+        const { clubId, status, joinedAt, manageremail, clubname, location } =
+          req.body;
 
         if (!clubId) {
           return res.status(400).json({ message: "clubId is required" });
@@ -279,20 +280,18 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/membersevent', verifyJWT, async(req,res) => {
-      const userEmail = req.tokenEmail;
-      const selectedclub = await eventRegistrationscollection
-        .find({ userEmail: userEmail })
+    app.get("/membersevent", verifyJWT, async (req, res) => {
+      const useremail = req.tokenEmail;
+      const selectedevent = await eventRegistrationscollection
+        .find({ useremail: useremail })
         .toArray();
 
-      if (selectedclub.length === 0) {
+      if (selectedevent.length === 0) {
         return res.send([]);
       }
 
-      res.send(selectedclub);
-
-    })
-
+      res.send(selectedevent);
+    });
 
     app.get("/event/by-wonermail", verifyJWT, async (req, res) => {
       try {
@@ -491,7 +490,7 @@ async function run() {
       res.send(members);
     });
 
-    app.get('/clubmembers', verifyJWT, async(req,res) => {
+    app.get("/clubmembers", verifyJWT, async (req, res) => {
       const userEmail = req.tokenEmail;
       const selectedclub = await membershipCollections
         .find({ userEmail: userEmail })
@@ -502,10 +501,7 @@ async function run() {
       }
 
       res.send(selectedclub);
-
-    })
-
-
+    });
 
     app.patch("/membership/:id/expire", async (req, res) => {
       const id = req.params.id;
@@ -564,7 +560,6 @@ async function run() {
         const clubId = session.metadata.plantId;
         const userEmail = session.customer_email;
 
-        
         const alreadyPaid = await paymentCollection.findOne({
           clubId: new ObjectId(clubId),
           userEmail: userEmail,
@@ -601,7 +596,6 @@ async function run() {
 
         const paymentResult = await paymentCollection.insertOne(paymentInfo);
 
-        // 🔄 ACTIVATE MEMBERSHIP
         await membershipCollections.updateOne(
           {
             clubId: String(clubId),
@@ -628,6 +622,180 @@ async function run() {
       }
     });
 
+    /* **** paymnet related api here******88 */
+
+    app.get("/payments", async (req, res) => {
+      const result = await paymentCollection.find().toArray();
+      res.send(result);
+    });
+
+    /* ********************  admin desh board overviews             ******************************************8 */
+
+    // ================= ADMIN SUMMARY API =================
+    app.get("/admin/summary", verifyJWT, async (req, res) => {
+      try {
+        /* ---------- USERS ---------- */
+        const totalUsers = await usersconllections.countDocuments();
+
+        /* ---------- CLUBS ---------- */
+        const totalClubs = await clubcollections.countDocuments();
+
+        const approvedClubs = await clubcollections.countDocuments({
+          status: "aproved",
+        });
+
+        const pendingClubs = await clubcollections.countDocuments({
+          status: "pending",
+        });
+
+        const rejectedClubs = await clubcollections.countDocuments({
+          status: "rejected",
+        });
+
+        /* ---------- MEMBERSHIPS ---------- */
+        const totalMemberships = await membershipCollections.countDocuments();
+
+        /* ---------- EVENTS ---------- */
+        const totalEvents = await eventscollections.countDocuments();
+
+        /* ---------- PAYMENTS (SUM) ---------- */
+        const paymentAgg = await paymentCollection
+          .aggregate([
+            { $match: { status: "paid" } },
+            {
+              $group: {
+                _id: null,
+                totalAmount: { $sum: "$price" },
+              },
+            },
+          ])
+          .toArray();
+
+        const totalPaymentAmount =
+          paymentAgg.length > 0 ? paymentAgg[0].totalAmount : 0;
+
+        /* ---------- RESPONSE ---------- */
+        res.status(200).json({
+          users: totalUsers,
+          clubs: {
+            total: totalClubs,
+            approved: approvedClubs,
+            pending: pendingClubs,
+            rejected: rejectedClubs,
+          },
+          memberships: totalMemberships,
+          events: totalEvents,
+          revenue: totalPaymentAmount,
+        });
+      } catch (error) {
+        console.error("Admin summary error:", error);
+        res.status(500).json({
+          message: "Failed to fetch admin summary",
+          error: error.message,
+        });
+      }
+    });
+
+    // ================= MANAGER SUMMARY API =================
+    app.get("/manager/summary", verifyJWT, async (req, res) => {
+      try {
+        const managerEmail = req.tokenEmail;
+
+        // ---------- Clubs managed by this manager ----------
+        const managerClubs = await clubcollections
+          .find({ managerEmail })
+          .toArray();
+        const totalClubs = managerClubs.length;
+
+        // ---------- Memberships in these clubs ----------
+        const clubIds = managerClubs.map((club) => String(club._id));
+        const totalMembers = await membershipCollections.countDocuments({
+          clubId: { $in: clubIds },
+        });
+
+        // ---------- Events created by this manager ----------
+        const totalEvents = await eventscollections.countDocuments({
+          createdBy: managerEmail,
+        });
+
+        // ---------- Payments received for these clubs ----------
+        const paymentsAgg = await paymentCollection
+          .aggregate([
+            {
+              $match: {
+                clubId: { $in: clubIds.map((id) => new ObjectId(id)) },
+                status: "paid",
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                totalAmount: { $sum: "$price" },
+              },
+            },
+          ])
+          .toArray();
+
+        const totalPaymentAmount =
+          paymentsAgg.length > 0 ? paymentsAgg[0].totalAmount : 0;
+
+        res.status(200).json({
+          clubs: totalClubs,
+          members: totalMembers,
+          events: totalEvents,
+          revenue: totalPaymentAmount,
+        });
+      } catch (error) {
+        console.error("Manager summary error:", error);
+        res.status(500).json({
+          message: "Failed to fetch manager summary",
+          error: error.message,
+        });
+      }
+    });
+
+    // ================= MEMBER SUMMARY API =================
+    app.get("/member/summary", verifyJWT, async (req, res) => {
+      try {
+        const userEmail = req.tokenEmail;
+
+        // ---------- Clubs joined ----------
+        const clubsJoined = await membershipCollections
+          .find({ userEmail })
+          .toArray();
+        const totalClubsJoined = clubsJoined.length;
+
+        // ---------- Events registered ----------
+        const clubIds = clubsJoined.map((m) => String(m.clubId));
+        const eventsRegistered = await eventRegistrationscollection
+          .find({ useremail: userEmail })
+          .toArray();
+        const totalEventsRegistered = eventsRegistered.length;
+
+        // ---------- Upcoming events from their clubs ----------
+        const now = new Date();
+        const upcomingEvents = await eventscollections
+          .find({
+            clubId: { $in: clubIds },
+            eventDate: { $gte: now },
+          })
+          .sort({ eventDate: 1 })
+          .toArray();
+
+        res.status(200).json({
+          totalClubsJoined,
+          totalEventsRegistered,
+          upcomingEvents,
+          userEmail,
+        });
+      } catch (error) {
+        console.error("Member summary error:", error);
+        res.status(500).json({
+          message: "Failed to fetch member summary",
+          error: error.message,
+        });
+      }
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log("Connected to MongoDB successfully!");
