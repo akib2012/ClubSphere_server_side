@@ -258,20 +258,17 @@ async function run() {
     });
 
     //  SEARCH & FILTER CLUBS
-    
+
     app.get("/club/search", async (req, res) => {
       try {
         const { search = "", category = "" } = req.query;
 
-       
         const query = { status: "aproved" };
 
-       
         if (search.trim() !== "") {
           query.clubName = { $regex: search.trim(), $options: "i" };
         }
 
-       
         if (category && category.trim() !== "") {
           query.category = { $regex: `^${category.trim()}$`, $options: "i" };
         }
@@ -289,8 +286,6 @@ async function run() {
           .json({ message: "Failed to search clubs", error: err.message });
       }
     });
-
-
 
     /* memberships related api here */
 
@@ -507,6 +502,43 @@ async function run() {
       const result = await eventscollections.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
+
+
+    // GET /events/search?search=&isPaid=
+    app.get("/event/search", async (req, res) => {
+      try {
+        const { search = "", isPaid } = req.query;
+
+        const query = {};
+
+        if (search.trim() !== "") {
+          query.$or = [
+            { title: { $regex: search.trim(), $options: "i" } },
+            { location: { $regex: search.trim(), $options: "i" } },
+          ];
+        }
+
+       
+
+        const events = await eventscollections.find(query).toArray();
+        res.status(200).json(events);
+      } catch (err) {
+        console.error("Search events error:", err);
+        res
+          .status(500)
+          .json({ message: "Failed to search events", error: err.message });
+      }
+    });
+    
+
+
+
+
+
+
+
+
+
 
     /* members ship api get here */
 
