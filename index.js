@@ -37,7 +37,7 @@ app.use(express.json());
 // JWT middleware
 const verifyJWT = async (req, res, next) => {
   const token = req.headers?.authorization?.split(" ")[1];
-  console.log("access token here: >>>>", token);
+  // console.log("access token here: >>>>", token);
   // console.log(req.tokenEmail);
 
   if (!token)
@@ -150,13 +150,12 @@ async function run() {
       res.send(approvedClubs);
     });
 
-    
     app.get("/approved-clubs", async (req, res) => {
       try {
         const result = await clubcollections
-          .find({ status: "aproved" }) 
-          .sort({createdAt: -1})
-          .limit(6) 
+          .find({ status: "aproved" })
+          .sort({ createdAt: -1 })
+          .limit(6)
           .toArray();
 
         res.send(result);
@@ -164,8 +163,6 @@ async function run() {
         res.status(500).send({ message: "Failed to load clubs" });
       }
     });
-
-
 
     app.get("/clubs/approved-by-email", verifyJWT, async (req, res) => {
       const email = req.tokenEmail;
@@ -259,6 +256,41 @@ async function run() {
 
       res.send(result);
     });
+
+    //  SEARCH & FILTER CLUBS
+    
+    app.get("/club/search", async (req, res) => {
+      try {
+        const { search = "", category = "" } = req.query;
+
+       
+        const query = { status: "aproved" };
+
+       
+        if (search.trim() !== "") {
+          query.clubName = { $regex: search.trim(), $options: "i" };
+        }
+
+       
+        if (category && category.trim() !== "") {
+          query.category = { $regex: `^${category.trim()}$`, $options: "i" };
+        }
+
+        const clubs = await clubcollections
+          .find(query)
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        res.status(200).json(clubs);
+      } catch (err) {
+        console.error("Search clubs error:", err);
+        res
+          .status(500)
+          .json({ message: "Failed to search clubs", error: err.message });
+      }
+    });
+
+
 
     /* memberships related api here */
 
