@@ -86,23 +86,20 @@ async function run() {
       next();
     };
 
-     const verifyMANAGER = async (req, res, next) => {
-      const email = req.tokenEmail
-      const user = await usersconllections.findOne({ email })
-      if (user?.role !== 'manager')
+    const verifyMANAGER = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const user = await usersconllections.findOne({ email });
+      if (user?.role !== "manager")
         return res
           .status(403)
-          .send({ message: 'manager only Actions!', role: user?.role })
+          .send({ message: "manager only Actions!", role: user?.role });
 
-      next()
-    }
-
-
-
+      next();
+    };
 
     // users api here
 
-    app.patch("/users/:id", async (req, res) => {
+    app.patch("/users/:id", verifyJWT, verifyADMIN, async (req, res) => {
       const id = req.params.id;
       const { role } = req.body;
 
@@ -152,6 +149,23 @@ async function run() {
         .toArray();
       res.send(approvedClubs);
     });
+
+    
+    app.get("/approved-clubs", async (req, res) => {
+      try {
+        const result = await clubcollections
+          .find({ status: "aproved" }) 
+          .sort({createdAt: -1})
+          .limit(6) 
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Failed to load clubs" });
+      }
+    });
+
+
 
     app.get("/clubs/approved-by-email", verifyJWT, async (req, res) => {
       const email = req.tokenEmail;
@@ -449,14 +463,14 @@ async function run() {
       });
     });
 
-    app.delete("/events/:id", async (req, res) => {
+    app.delete("/events/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const result = await eventscollections.deleteOne({
         _id: new ObjectId(id),
       });
       res.send(result);
     });
-    app.get("/events/:id", async (req, res) => {
+    app.get("/events/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const result = await eventscollections.findOne({ _id: new ObjectId(id) });
       res.send(result);
@@ -495,7 +509,7 @@ async function run() {
 
     // mambesship get for the deshboard :
 
-    app.get("/membership", verifyJWT, async (req, res) => {
+    app.get("/membership", verifyJWT, verifyMANAGER, async (req, res) => {
       const userEmail = req.tokenEmail;
 
       const clubs = await clubcollections
@@ -528,21 +542,26 @@ async function run() {
       res.send(selectedclub);
     });
 
-    app.patch("/membership/:id/expire", async (req, res) => {
-      const id = req.params.id;
+    app.patch(
+      "/membership/:id/expire",
+      verifyJWT,
+      verifyMANAGER,
+      async (req, res) => {
+        const id = req.params.id;
 
-      const result = await membershipCollections.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { status: "expired" } }
-      );
+        const result = await membershipCollections.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: "expired" } }
+        );
 
-      res.send(result);
-    });
+        res.send(result);
+      }
+    );
 
     /* .................... payments related api >>>>......................................... */
     // Payment endpoints
 
-    app.post("/create-checkout-session", async (req, res) => {
+    app.post("/create-checkout-session", verifyJWT, async (req, res) => {
       const paymentInfo = req.body;
       console.log(paymentInfo);
       const session = await stripe.checkout.sessions.create({
@@ -572,7 +591,7 @@ async function run() {
       res.send({ url: session.url });
     });
 
-    app.post("/payment-success", async (req, res) => {
+    app.post("/payment-success", verifyJWT, async (req, res) => {
       try {
         const { sessionId } = req.body;
 
@@ -647,7 +666,7 @@ async function run() {
       }
     });
 
-    app.get("/payments", async (req, res) => {
+    app.get("/payments", verifyJWT, verifyADMIN, async (req, res) => {
       const result = await paymentCollection.find().toArray();
       res.send(result);
     });
@@ -674,7 +693,7 @@ async function run() {
     /* ********************  admin desh board overviews             ******************************************8 */
 
     // ================= ADMIN SUMMARY API =================
-    app.get("/admin/summary", verifyJWT, async (req, res) => {
+    app.get("/admin/summary", verifyJWT, verifyADMIN, async (req, res) => {
       try {
         /* ---------- USERS ---------- */
         const totalUsers = await usersconllections.countDocuments();
@@ -739,7 +758,7 @@ async function run() {
     });
 
     // ================= MANAGER SUMMARY API =================
-    app.get("/manager/summary", verifyJWT, async (req, res) => {
+    app.get("/manager/summary", verifyJWT, verifyMANAGER, async (req, res) => {
       try {
         const managerEmail = req.tokenEmail;
 
