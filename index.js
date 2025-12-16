@@ -111,6 +111,15 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/userprofile',verifyJWT,async(req,res) =>{
+      const email = req.tokenEmail;
+      const result = await usersconllections.findOne({email: email})
+
+      res.send(result);
+
+    })
+
+
     app.post("/users", async (req, res) => {
       const usersinfo = req.body;
       usersinfo.createdAt = new Date();
