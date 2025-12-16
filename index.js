@@ -622,6 +622,36 @@ async function run() {
       }
     );
 
+
+
+    /* stat related api here */
+    app.get("/clubss/:id/stats",verifyJWT,verifyADMIN, async (req, res) => {
+  try {
+    const clubId = req.params.id;
+
+    
+    const totalMembers = await membershipCollections.countDocuments({
+      clubId: String(clubId),
+      status: { $ne: "expired" }, 
+    });
+
+   
+    const totalEvents = await eventscollections.countDocuments({
+      clubId: String(clubId),
+    });
+
+    res.send({
+      clubId,
+      totalMembers,
+      totalEvents,
+    });
+  } catch (error) {
+    console.error("Club stats error:", error);
+    res.status(500).send({ message: "Failed to fetch club stats" });
+  }
+});
+
+
     /* .................... payments related api >>>>......................................... */
     // Payment endpoints
 
