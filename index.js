@@ -118,7 +118,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/users",verifyJWT, async (req, res) => {
+    app.post("/users", verifyJWT, async (req, res) => {
       const usersinfo = req.body;
       usersinfo.createdAt = new Date();
       usersinfo.role = "member";
@@ -135,7 +135,7 @@ async function run() {
 
     // get user for the role based
 
-    app.get("/users/:email/role",verifyJWT, async (req, res) => {
+    app.get("/users/:email/role", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const user = await usersconllections.findOne(query);
@@ -143,14 +143,14 @@ async function run() {
     });
 
     // all users here:
-    app.get("/users",verifyJWT,verifyADMIN, async (req, res) => {
+    app.get("/users", verifyJWT, verifyADMIN, async (req, res) => {
       const result = await usersconllections.find().toArray();
       res.send(result);
     });
 
     /* clube related api here */
 
-    app.get("/clubs/approved",verifyJWT, async (req, res) => {
+    app.get("/clubs/approved", async (req, res) => {
       const approvedClubs = await clubcollections
         .find({ status: "aproved" })
         .sort({ createdAt: -1 })
@@ -158,7 +158,7 @@ async function run() {
       res.send(approvedClubs);
     });
 
-    app.get("/approved-clubs",verifyJWT, async (req, res) => {
+    app.get("/approved-clubs", async (req, res) => {
       try {
         const result = await clubcollections
           .find({ status: "aproved" })
@@ -189,13 +189,13 @@ async function run() {
       res.send(approvedClubs);
     });
 
-    app.get("/clubs/:id",verifyJWT, async (req, res) => {
+    app.get("/clubs/:id", verifyJWT, async (req, res) => {
       const id = new ObjectId(req.params.id);
       const result = await clubcollections.findOne({ _id: id });
       res.send(result);
     });
 
-    app.get("/clubs",verifyJWT, async (req, res) => {
+    app.get("/clubs", verifyJWT, async (req, res) => {
       const cursor = clubcollections.find();
       const result = await cursor.toArray();
       res.send(result);
@@ -211,13 +211,13 @@ async function run() {
 
     // Update club (manager only)
 
-    app.post("/club",verifyJWT,verifyMANAGER, async (req, res) => {
+    app.post("/club", verifyJWT, verifyMANAGER, async (req, res) => {
       const clubinfo = req.body;
       const result = await clubcollections.insertOne(clubinfo);
       res.send(result);
     });
 
-    app.patch("/clubs/:id/status",verifyJWT, async (req, res) => {
+    app.patch("/clubs/:id/status", verifyJWT, async (req, res) => {
       const { id } = req.params;
       const { status } = req.body;
 
@@ -230,7 +230,7 @@ async function run() {
 
     /* update the club info here */
 
-    app.patch("/clubs/:id",verifyJWT, async (req, res) => {
+    app.patch("/clubs/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const updatedData = req.body;
 
@@ -255,7 +255,7 @@ async function run() {
 
     /* clubs delete here */
 
-    app.delete("/clubs/:id",verifyJWT,verifyMANAGER, async (req, res) => {
+    app.delete("/clubs/:id", verifyJWT, verifyMANAGER, async (req, res) => {
       const id = req.params.id;
 
       const result = await clubcollections.deleteOne({
@@ -268,7 +268,7 @@ async function run() {
     //  SEARCH & FILTER CLUBS
 
     // GET /club/search?search=&category=&sort=
-    app.get("/club/search",verifyJWT, async (req, res) => {
+    app.get("/club/search", verifyJWT, async (req, res) => {
       try {
         const { search = "", category = "", sort = "newest" } = req.query;
 
@@ -364,7 +364,7 @@ async function run() {
 
     /* .....................event create here.....and all api....... */
 
-    app.post("/events",verifyJWT, async (req, res) => {
+    app.post("/events", verifyJWT, async (req, res) => {
       const eventinfo = req.body;
       const result = await eventscollections.insertOne(eventinfo);
       res.send(result);
@@ -402,7 +402,7 @@ async function run() {
       }
     });
 
-    app.patch("/events/:id",verifyJWT, async (req, res) => {
+    app.patch("/events/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const updatedData = req.body;
 
@@ -424,7 +424,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/eventRegistrations",verifyJWT, async (req, res) => {
+    app.post("/eventRegistrations", verifyJWT, async (req, res) => {
       const info = req.body;
 
       const { useremail, evnetid } = info;
@@ -450,13 +450,13 @@ async function run() {
       });
     });
 
-    app.get("/eventRegistrations",verifyJWT, async (req, res) => {
+    app.get("/eventRegistrations", verifyJWT, async (req, res) => {
       const result = await eventRegistrationscollection.find().toArray();
 
       res.send(result);
     });
 
-    app.get("/eventRegistrations/evnetid",verifyJWT, async (req, res) => {
+    app.get("/eventRegistrations/evnetid", verifyJWT, async (req, res) => {
       const eventid = req.query.evnetid;
       const email = req.query.useremail;
 
@@ -475,7 +475,7 @@ async function run() {
     });
 
     ///  get one
-    app.get("/eventRegistrations/evnetid",verifyJWT, async (req, res) => {
+    /* app.get("/eventRegistrations/evnetid",verifyJWT, async (req, res) => {
       const eventid = req.query.evnetid;
       const email = req.query.useremail;
 
@@ -491,11 +491,11 @@ async function run() {
       });
 
       res.send(result);
-    });
+    }); */
 
     //  delte one
 
-    app.patch("/eventRegistrations/cancel",verifyJWT, async (req, res) => {
+    app.patch("/eventRegistrations/cancel", verifyJWT, async (req, res) => {
       const { evnetid, useremail } = req.query;
 
       if (!evnetid || !useremail) {
@@ -964,8 +964,8 @@ async function run() {
       }
     });
 
-    await client.db("admin").command({ ping: 1 });
-    console.log("Connected to MongoDB successfully!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Connected to MongoDB successfully!");
   } catch (err) {
     console.error("MongoDB connection failed:", err);
   }

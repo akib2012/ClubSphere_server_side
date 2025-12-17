@@ -1,3 +1,4 @@
 node_modules
 .env
 assingment-firebase-adminsdk.json
+.vercel
