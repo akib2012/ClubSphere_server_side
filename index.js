@@ -111,14 +111,12 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/userprofile',verifyJWT,async(req,res) =>{
+    app.get("/userprofile", verifyJWT, async (req, res) => {
       const email = req.tokenEmail;
-      const result = await usersconllections.findOne({email: email})
+      const result = await usersconllections.findOne({ email: email });
 
       res.send(result);
-
-    })
-
+    });
 
     app.post("/users", async (req, res) => {
       const usersinfo = req.body;
@@ -155,6 +153,7 @@ async function run() {
     app.get("/clubs/approved", async (req, res) => {
       const approvedClubs = await clubcollections
         .find({ status: "aproved" })
+        .sort({ createdAt: -1 })
         .toArray();
       res.send(approvedClubs);
     });
@@ -268,23 +267,45 @@ async function run() {
 
     //  SEARCH & FILTER CLUBS
 
+    // GET /club/search?search=&category=&sort=
     app.get("/club/search", async (req, res) => {
       try {
-        const { search = "", category = "" } = req.query;
+        const { search = "", category = "", sort = "newest" } = req.query;
 
         const query = { status: "aproved" };
 
+        // Search by club name
         if (search.trim() !== "") {
           query.clubName = { $regex: search.trim(), $options: "i" };
         }
 
+        // Filter by category
         if (category && category.trim() !== "") {
           query.category = { $regex: `^${category.trim()}$`, $options: "i" };
         }
 
+        // Sort options
+        let sortOption = {};
+        switch (sort) {
+          case "newest":
+            sortOption = { createdAt: -1 };
+            break;
+          case "oldest":
+            sortOption = { createdAt: 1 };
+            break;
+          case "highestFee":
+            sortOption = { membershipFee: -1 };
+            break;
+          case "lowestFee":
+            sortOption = { membershipFee: 1 };
+            break;
+          default:
+            sortOption = { createdAt: -1 };
+        }
+
         const clubs = await clubcollections
           .find(query)
-          .sort({ createdAt: -1 })
+          .sort(sortOption)
           .toArray();
 
         res.status(200).json(clubs);
@@ -350,7 +371,7 @@ async function run() {
     });
 
     app.get("/Events", async (req, res) => {
-      const events = eventscollections.find();
+      const events = eventscollections.find().sort({ createdAt: -1 });
       const result = await events.toArray();
       res.send(result);
     });
@@ -512,7 +533,6 @@ async function run() {
       res.send(result);
     });
 
-
     // GET /events/search?search=&isPaid=
     app.get("/event/search", async (req, res) => {
       try {
@@ -527,8 +547,6 @@ async function run() {
           ];
         }
 
-       
-
         const events = await eventscollections.find(query).toArray();
         res.status(200).json(events);
       } catch (err) {
@@ -538,16 +556,6 @@ async function run() {
           .json({ message: "Failed to search events", error: err.message });
       }
     });
-    
-
-
-
-
-
-
-
-
-
 
     /* members ship api get here */
 
@@ -631,35 +639,30 @@ async function run() {
       }
     );
 
-
-
     /* stat related api here */
-    app.get("/clubss/:id/stats",verifyJWT,verifyADMIN, async (req, res) => {
-  try {
-    const clubId = req.params.id;
+    app.get("/clubss/:id/stats", verifyJWT, verifyADMIN, async (req, res) => {
+      try {
+        const clubId = req.params.id;
 
-    
-    const totalMembers = await membershipCollections.countDocuments({
-      clubId: String(clubId),
-      status: { $ne: "expired" }, 
+        const totalMembers = await membershipCollections.countDocuments({
+          clubId: String(clubId),
+          status: { $ne: "expired" },
+        });
+
+        const totalEvents = await eventscollections.countDocuments({
+          clubId: String(clubId),
+        });
+
+        res.send({
+          clubId,
+          totalMembers,
+          totalEvents,
+        });
+      } catch (error) {
+        console.error("Club stats error:", error);
+        res.status(500).send({ message: "Failed to fetch club stats" });
+      }
     });
-
-   
-    const totalEvents = await eventscollections.countDocuments({
-      clubId: String(clubId),
-    });
-
-    res.send({
-      clubId,
-      totalMembers,
-      totalEvents,
-    });
-  } catch (error) {
-    console.error("Club stats error:", error);
-    res.status(500).send({ message: "Failed to fetch club stats" });
-  }
-});
-
 
     /* .................... payments related api >>>>......................................... */
     // Payment endpoints
