@@ -697,7 +697,7 @@ async function run() {
       res.send({ url: session.url });
     });
 
-    app.post("/payment-success", verifyJWT, async (req, res) => {
+    app.post("/payment-success", async (req, res) => {
       try {
         const { sessionId } = req.body;
 
