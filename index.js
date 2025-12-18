@@ -268,7 +268,7 @@ async function run() {
     //  SEARCH & FILTER CLUBS
 
     // GET /club/search?search=&category=&sort=
-    app.get("/club/search", verifyJWT, async (req, res) => {
+    app.get("/club/search", async (req, res) => {
       try {
         const { search = "", category = "", sort = "newest" } = req.query;
 
