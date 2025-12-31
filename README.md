@@ -147,9 +147,6 @@ dotenv
 
 
 
-🔗 Related Repositories
-Client Repository: [Insert Client Repo URL]
-Live Site: [Insert Live URL]
 
 
 Developed by: MD Perbej Bhuiyan Akib
