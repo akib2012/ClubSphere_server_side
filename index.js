@@ -151,12 +151,59 @@ async function run() {
     /* clube related api here */
 
     app.get("/clubs/approved", async (req, res) => {
-      const approvedClubs = await clubcollections
-        .find({ status: "aproved" })
-        .sort({ createdAt: -1 })
-        .toArray();
-      res.send(approvedClubs);
+      try {
+        const {
+          search = "",
+          category = "",
+          sort = "newest",
+          page = 1,
+          limit = 8,
+        } = req.query;
+
+        const query = { status: "aproved" };
+
+        // 🔍 Search
+        if (search.trim()) {
+          query.clubName = { $regex: search.trim(), $options: "i" };
+        }
+
+        // 📂 Category filter
+        if (category.trim()) {
+          query.category = category;
+        }
+
+        // ↕ Sorting
+        let sortOption = { createdAt: -1 };
+        if (sort === "oldest") sortOption = { createdAt: 1 };
+        if (sort === "highestFee") sortOption = { membershipFee: -1 };
+        if (sort === "lowestFee") sortOption = { membershipFee: 1 };
+
+        const skip = (Number(page) - 1) * Number(limit);
+
+        const totalClubs = await clubcollections.countDocuments(query);
+
+        const clubs = await clubcollections
+          .find(query)
+          .sort(sortOption)
+          .skip(skip)
+          .limit(Number(limit))
+          .toArray();
+
+        res.send({
+          clubs,
+          totalPages: Math.ceil(totalClubs / limit),
+          currentPage: Number(page),
+        });
+      } catch (error) {
+        console.error("Pagination error:", error);
+        res.status(500).send({ message: "Failed to load clubs" });
+      }
     });
+
+
+
+
+    
 
     app.get("/approved-clubs", async (req, res) => {
       try {
@@ -189,7 +236,7 @@ async function run() {
       res.send(approvedClubs);
     });
 
-    app.get("/clubs/:id", verifyJWT, async (req, res) => {
+    app.get("/clubs/:id", async (req, res) => {
       const id = new ObjectId(req.params.id);
       const result = await clubcollections.findOne({ _id: id });
       res.send(result);
